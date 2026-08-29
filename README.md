@@ -170,13 +170,4 @@ confirma que las cabeceras personalizadas (`x-app-name: device_systems`,
 `x-api-version: 1.0`) se agregan incluso en las respuestas de error, gracias
 al middleware definido en `main.py`.
 
-## Reflexión sobre el uso de FastAPI
-
-*(Espacio para completar: qué tan fácil fue definir validaciones con Pydantic comparado con hacerlo a mano, qué ventaja viste en tener Swagger UI generado automáticamente, qué se te dificultó)*
-
-## Recursos usados
-
-- Material del curso: Introducción a FastAPI, métodos GET/POST, Path/Query Parameters, Pydantic v2, Response Models y cabeceras HTTP.
-- Documentación oficial de FastAPI: https://fastapi.tiangolo.com/
-- Documentación oficial de Pydantic: https://docs.pydantic.dev/
 
