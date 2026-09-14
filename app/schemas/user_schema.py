@@ -1,15 +1,14 @@
 # app/schemas/user_schema.py
-# Modelos de datos (Pydantic v2) para validar entradas y estructurar salidas
-
+from datetime import datetime
 from typing import Literal, Optional
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 class UserBase(BaseModel):
-    name: str = Field(..., min_length=3, description="Nombre completo del usuario")
-    email: EmailStr = Field(..., description="Correo electronico unico del usuario")
-    role: Literal["admin", "support", "user"] = Field(..., description="Rol del usuario en el sistema")
-    is_active: bool = Field(default=True, description="Indica si el usuario esta activo")
+    name: str = Field(..., min_length=3)
+    email: EmailStr
+    role: Literal["admin", "support", "user"]
+    is_active: bool = Field(default=True)
 
 
 class UserCreate(UserBase):
@@ -22,13 +21,12 @@ class UserUpdate(UserBase):
 
 class UserPatch(BaseModel):
     name: Optional[str] = Field(None, min_length=3)
-    email: Optional[EmailStr] = Field(None)
-    role: Optional[Literal["admin", "support", "user"]] = Field(None)
-    is_active: Optional[bool] = Field(None)
+    email: Optional[EmailStr] = None
+    role: Optional[Literal["admin", "support", "user"]] = None
+    is_active: Optional[bool] = None
 
 
 class UserResponse(UserBase):
-    id: int = Field(..., description="Identificador unico del usuario")
-
-    class Config:
-        from_attributes = True
+    id: int
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
