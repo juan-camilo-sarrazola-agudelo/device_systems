@@ -39,7 +39,7 @@ device_systems/
 
 📸 *Estructura real del proyecto en VS Code, con el servidor levantado en la terminal:*
 
-![Estructura del proyecto y servidor corriendo](images/evo9/2026-09-16_08h30_53.png)
+![Estructura del proyecto y servidor corriendo](imagenes/evo9/2026-09-16_08h30_53.png)
 
 ## 🗄️ Configuración y evidencia de la base de datos
 
@@ -145,7 +145,7 @@ class UserResponse(UserBase):
 
 FastAPI genera automáticamente la documentación a partir de las rutas, los schemas y los modelos. Ahí se ven de un vistazo los 6 endpoints de `/users` más la raíz `/`:
 
-![Swagger UI - vista general de los endpoints](images/evo9/swagger_general.png)
+![Swagger UI - vista general de los endpoints](imagenes/evo9/swagger_general.png)
 
 ## 📋 Tabla de endpoints
 
@@ -164,37 +164,37 @@ FastAPI genera automáticamente la documentación a partir de las rutas, los sch
 Todas estas pruebas se ejecutaron con Postman contra el servidor real, verificando que la información quedara efectivamente persistida en la base de datos:
 
 **Crear usuario (`POST /users`)** — `201 Created`, con `id` y `created_at` asignados por la base de datos:
-![POST exitoso](images/evo9/postman_post_exitoso.png)
+![POST exitoso](imagenes/evo9/postman_post_exitoso.png)
 
 **Listar usuarios (`GET /users`)** — `200 OK`:
-![GET listar usuarios](images/evo9/postman_get_users.png)
+![GET listar usuarios](imagenes/evo9/postman_get_users.png)
 
 **Filtrar por rol (`GET /users?role=admin`)** — `200 OK`, solo los usuarios del rol solicitado:
-![Filtro por rol](images/evo9/postman_filtro_rol.png)
+![Filtro por rol](imagenes/evo9/postman_filtro_rol.png)
 
 **Filtrar por activos (`GET /users?is_active=true`)** — `200 OK`:
-![Filtro por activos](images/evo9/postman_filtro_activos.png)
+![Filtro por activos](imagenes/evo9/postman_filtro_activos.png)
 
 **Actualizar completo (`PUT /users/{id}`)** — `200 OK`, todos los campos reemplazados:
-![PUT exitoso](images/evo9/postman_put_exitoso.png)
+![PUT exitoso](imagenes/evo9/postman_put_exitoso.png)
 
 **Actualizar parcial (`PATCH /users/{id}`)** — `200 OK`, solo cambia el campo enviado:
-![PATCH parcial](images/evo9/postman_patch_parcial.png)
+![PATCH parcial](imagenes/evo9/postman_patch_parcial.png)
 
 **Eliminar usuario (`DELETE /users/{id}`)** — `200 OK`:
-![DELETE exitoso](images/evo9/postman_delete_exitoso.png)
+![DELETE exitoso](imagenes/evo9/postman_delete_exitoso.png)
 
 **Confirmación de la eliminación** — al volver a consultar el mismo id, responde `404 Not Found`, es decir, el registro se borró de verdad de la base de datos y no solo de la respuesta:
-![Confirmación DELETE - 404](images/evo9/postman_delete_confirmado_404.png)
+![Confirmación DELETE - 404](imagenes/evo9/postman_delete_confirmado_404.png)
 
 ## ⚠️ Evidencia de errores controlados
 
 | Escenario | Código | Captura |
 |---|---|---|
-| Usuario inexistente (`GET /users/999`) | `404 Not Found` | ![404 usuario no encontrado](images/evo9/postman_get_users_404.png) |
-| Correo duplicado (`POST /users`) | `400 Bad Request` | ![400 correo duplicado](images/evo9/postman_post_duplicado_400.png) |
-| PATCH sin ningún campo enviado | `400 Bad Request` | ![400 patch vacío](images/evo9/postman_patch_vacio_400.png) |
-| Datos inválidos — nombre corto / email mal formado / rol no permitido | `422 Unprocessable Entity` | ![422 datos inválidos](images/evo9/postman_post_invalido_422.png) |
+| Usuario inexistente (`GET /users/999`) | `404 Not Found` | ![404 usuario no encontrado](imagenes/evo9/postman_get_users_404.png) |
+| Correo duplicado (`POST /users`) | `400 Bad Request` | ![400 correo duplicado](imagenes/evo9/postman_post_duplicado_400.png) |
+| PATCH sin ningún campo enviado | `400 Bad Request` | ![400 patch vacío](imagenes/evo9/postman_patch_vacio_400.png) |
+| Datos inválidos — nombre corto / email mal formado / rol no permitido | `422 Unprocessable Entity` | ![422 datos inválidos](imagenes/evo9/postman_post_invalido_422.png) |
 
 En ningún caso la API se cae o responde con un error genérico de servidor: cada escenario devuelve un código HTTP coherente y un mensaje claro sobre qué salió mal, gracias a la combinación de las validaciones de Pydantic (schemas) y las reglas de negocio explícitas en `user_service.py` y `user_routes.py`.
 
