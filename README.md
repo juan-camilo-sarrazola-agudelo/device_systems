@@ -1,67 +1,121 @@
 # device_systems
 
 **Aprendiz:** Juan Camilo Sarrazola
-**Actividad:** GA1-220501096-01-AA1-EV08 — FastAPI Intermedio: Evolución de device_systems con CRUD completo, manejo de errores, Swagger/OpenAPI y Dependency Injection
+**Actividad:** GA1-220501096-01-AA1-EV09 — FastAPI con SQLAlchemy: Persistencia de Datos y CRUD sobre Base de Datos
 
 ---
 
-## Descripción de la API
+##  Descripción de la API
 
-`device_systems` es una API REST construida con FastAPI para gestionar los usuarios de un sistema. Esta versión (**v2.0.0**) evoluciona la API básica de la actividad anterior (EV07, solo `GET`/`POST`) hacia un **CRUD completo**: ahora permite crear, listar, consultar, filtrar, actualizar (completa o parcialmente) y eliminar usuarios, con manejo de errores estructurado, códigos de estado HTTP correctos, reutilización de lógica mediante `Depends()`, y documentación automática mejorada con Swagger/OpenAPI.
+`device_systems` evoluciona  (CRUD completo, pero con los usuarios guardados en una simple lista en memoria) a la **v3.0**: ahora los usuarios se almacenan en una **base de datos real** (SQLite) mediante **SQLAlchemy**. Esto significa que los datos ya **no se pierden** al reiniciar el servidor — quedan guardados en el archivo `device_systems.db`.
 
-## Tecnologías utilizadas
-
-| Tecnología | Uso en el proyecto |
-|---|---|
-| **FastAPI** | Framework principal para construir la API |
-| **Uvicorn** | Servidor ASGI que ejecuta la aplicación |
-| **Pydantic v2** | Validación y serialización de datos de entrada/salida |
-| **email-validator** | Validación del formato de correos (requerido por `EmailStr`) |
+La API sigue exponiendo el recurso `/users` con el CRUD completo (`GET`, `POST`, `PUT`, `PATCH`, `DELETE`), pero ahora cada operación ejecuta consultas reales contra la base de datos, con restricciones (`constraints`) definidas directamente en el modelo.
 
 
-## Explicación de la estructura del proyecto
+## 🗂️ Estructura del proyecto
 
 ```
 device_systems/
 ├── app/
-│   ├── __init__.py
-│   ├── main.py                       ← arranca la app, metadatos Swagger, cabeceras
-│   ├── routes/
-│   │   └── user_routes.py            ← endpoints: GET, POST, PUT, PATCH, DELETE
+│   ├── main.py                        ← arranca la app, crea las tablas, metadatos Swagger
+│   ├── database/
+│   │   └── connection.py              ← engine, SessionLocal, Base declarativa
+│   ├── models/
+│   │   └── user_model.py              ← modelo SQLAlchemy (la tabla "users")
 │   ├── schemas/
-│   │   └── user_schema.py            ← UserCreate, UserUpdate, UserPatch, UserResponse
+│   │   └── user_schema.py             ← UserCreate, UserUpdate, UserPatch, UserResponse
+│   ├── routes/
+│   │   └── user_routes.py             ← endpoints: GET, POST, PUT, PATCH, DELETE
 │   ├── services/
-│   │   └── user_service.py           ← lógica de negocio (CRUD sobre users_db)
-│   ├── dependencies/
-│   │   └── user_dependencies.py      ← funciones reutilizables con Depends()
-│   └── data/
-│       └── users_db.py               ← "base de datos" en memoria
-├── images/                           ← capturas de Swagger UI, ReDoc y Postman
+│   │   └── user_service.py            ← lógica CRUD ejecutada contra la base de datos
+│   └── dependencies/
+│       ├── database_dependency.py     ← get_db(): entrega una sesión de BD por petición
+│       └── user_dependencies.py       ← get_user_or_404(): reutilizada en 4 rutas
+├── images/evo9/                       ← capturas de esta entrega
 ├── requirements.txt
+├── .gitignore                          ← ignora venv/, __pycache__/ y el .db generado
 └── README.md
 ```
 
-Cada carpeta tiene una sola responsabilidad, siguiendo el principio de separación de capas:
+📸 *Estructura real del proyecto en VS Code, con el servidor levantado en la terminal:*
 
-- **`routes/`** solo define endpoints (qué URL, qué método, qué modelo espera). No sabe cómo se buscan o guardan los usuarios.
-- **`services/`** contiene toda la lógica de negocio (buscar, crear, actualizar, eliminar). Las rutas la llaman; nunca tocan `users_db` directamente.
-- **`schemas/`** define la forma de los datos de entrada y salida, con sus validaciones.
-- **`dependencies/`** contiene funciones reutilizables (como buscar un usuario y lanzar `404` si no existe), inyectadas con `Depends()`.
-- **`data/`** simula la base de datos. Si mañana se conecta una base real, solo cambia este archivo.
+![Estructura del proyecto y servidor corriendo](images/evo9/2026-09-16_08h30_53.png)
 
-## Tabla de endpoints
+## 🗄️ Configuración y evidencia de la base de datos
 
-| Operación | Método | Ruta | Código esperado |
-|---|---|---|---|
-| Listar usuarios | GET | `/users` | `200 OK` |
-| Filtrar por rol/estado | GET | `/users?role=admin` / `?is_active=true` | `200 OK` |
-| Consultar usuario | GET | `/users/{user_id}` | `200 OK` / `404 Not Found` |
-| Crear usuario | POST | `/users` | `201 Created` / `400` / `422` |
-| Actualizar completo | PUT | `/users/{user_id}` | `200 OK` / `404` / `400` |
-| Actualizar parcial | PATCH | `/users/{user_id}` | `200 OK` / `404` / `400` |
-| Eliminar usuario | DELETE | `/users/{user_id}` | `200 OK` / `404 Not Found` |
+`app/database/connection.py` define 3 piezas clave:
 
-## Modelos Pydantic (entrada y salida)
+```python
+DATABASE_URL = "sqlite:///./device_systems.db"
+
+engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
+```
+
+- **`engine`**: la conexión real hacia el archivo SQLite.
+- **`SessionLocal`**: una "fábrica" de sesiones — cada petición HTTP obtiene su propia sesión nueva.
+- **`Base`**: la clase de la que heredan todos los modelos (tablas).
+
+En `app/main.py`, la línea `Base.metadata.create_all(bind=engine)` es la que efectivamente crea la tabla `users` en el archivo `device_systems.db`, leyendo la definición desde `user_model.py`.
+
+La prueba real de que la persistencia funciona no es solo que el archivo `.db` exista, sino que los datos sobreviven entre peticiones y reinicios: se creó un usuario por `POST`, se reinició el servidor y al volver a consultarlo con `GET` seguía ahí — algo que con la lista en memoria de la EV08 era imposible.
+
+## 🔄 Diferencia entre modelo SQLAlchemy y schema Pydantic
+
+Esta es la distinción más importante de esta actividad — son **dos clases distintas, con propósitos distintos**, aunque ambas describan "un usuario":
+
+| | Modelo SQLAlchemy (`app/models/user_model.py`) | Schema Pydantic (`app/schemas/user_schema.py`) |
+|---|---|---|
+| ¿Qué representa? | Una **tabla** de la base de datos | La **forma de los datos** que entran/salen por HTTP |
+| ¿De qué hereda? | `Base` (de SQLAlchemy) | `BaseModel` (de Pydantic) |
+| ¿Qué hace con los datos? | Los **guarda y consulta** en SQLite | Los **valida y serializa** (JSON ↔ Python) |
+| ¿Sabe algo de HTTP? | No, nunca ve una petición | Sí, es lo que FastAPI usa en el `body` y la respuesta |
+| ¿Sabe algo de SQL? | Sí (`Column`, `nullable`, `unique`) | No, nunca genera una consulta |
+| Ejemplo de un campo | `email = Column(String, unique=True, nullable=False)` | `email: EmailStr` |
+
+```python
+# app/models/user_model.py — DESCRIBE LA TABLA
+class User(Base):
+    __tablename__ = "users"
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String, unique=True, nullable=False, index=True)
+    ...
+
+# app/schemas/user_schema.py — DESCRIBE LA ENTRADA/SALIDA DE LA API
+class UserCreate(BaseModel):
+    email: EmailStr
+    ...
+```
+
+**¿Por qué no usar uno solo?** Porque cumplen reglas distintas. El modelo necesita reglas de *base de datos* (`unique=True` evita duplicados a nivel de tabla, `nullable=False` es una restricción de columna). El schema necesita reglas de *validación de entrada* (`EmailStr` verifica el formato, `Literal[...]` restringe valores permitidos) — y además, el schema de **salida** (`UserResponse`) no debería exponer necesariamente los mismos campos que tiene la tabla (por ejemplo, si hubiera una contraseña en el modelo, jamás debería aparecer en `UserResponse`).
+
+La conexión entre ambos ocurre en el servicio: `user_service.crear_usuario()` recibe un diccionario (ya validado por el schema `UserCreate`) y crea un objeto `User` (el modelo) con esos datos, para guardarlo en la base de datos.
+
+### El modelo SQLAlchemy (constraints aplicados)
+
+```python
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)
+    email = Column(String, unique=True, nullable=False, index=True)
+    role = Column(String, nullable=False)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+```
+
+| Campo | Tipo | Restricción |
+|---|---|---|
+| `id` | `Integer` | `primary_key=True` (clave única autogenerada) |
+| `name` | `String` | `nullable=False` (obligatorio) |
+| `email` | `String` | `unique=True, nullable=False` (único y obligatorio) |
+| `role` | `String` | `nullable=False` (obligatorio) |
+| `is_active` | `Boolean` | `default=True` |
+| `created_at` | `DateTime` | `default=datetime.utcnow` (se asigna sola al crear) |
+
+### Schemas Pydantic
 
 ```python
 class UserBase(BaseModel):
@@ -70,217 +124,84 @@ class UserBase(BaseModel):
     role: Literal["admin", "support", "user"]
     is_active: bool = True
 
-class UserCreate(UserBase): pass      # POST: todos los campos obligatorios
-class UserUpdate(UserBase): pass      # PUT: todos los campos obligatorios (reemplazo total)
+class UserCreate(UserBase): pass
+class UserUpdate(UserBase): pass
 
-class UserPatch(BaseModel):           # PATCH: todos los campos OPCIONALES
+class UserPatch(BaseModel):
     name: Optional[str] = None
     email: Optional[EmailStr] = None
     role: Optional[Literal["admin", "support", "user"]] = None
     is_active: Optional[bool] = None
 
 class UserResponse(UserBase):
-    id: int                           # lo único que se agrega en la salida
+    id: int
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
 ```
 
-## Ejemplos de peticiones y respuestas
+`from_attributes=True` es la pieza clave que conecta ambos mundos: le permite a `UserResponse` construirse directamente a partir de un objeto `User` (SQLAlchemy), leyendo sus atributos como si fuera un diccionario.
 
-### GET /users?role=admin
+## 📖 Documentación interactiva (Swagger UI)
 
-```bash
-curl "http://127.0.0.1:8000/users?role=admin"
-```
-```json
-[{"name": "Ana Torres", "email": "ana@correo.com", "role": "admin", "is_active": true, "id": 1}]
-```
+FastAPI genera automáticamente la documentación a partir de las rutas, los schemas y los modelos. Ahí se ven de un vistazo los 6 endpoints de `/users` más la raíz `/`:
 
-### POST /users
+![Swagger UI - vista general de los endpoints](images/evo9/swagger_general.png)
 
-```bash
-curl -X POST http://127.0.0.1:8000/users \
-  -H "Content-Type: application/json" \
-  -d '{"name": "Sofía Restrepo", "email": "sofia@correo.com", "role": "user", "is_active": true}'
-```
-```json
-{"name": "Sofía Restrepo", "email": "sofia@correo.com", "role": "user", "is_active": true, "id": 4}
-```
-Código: `201 Created`
+## 📋 Tabla de endpoints
 
-### PUT /users/2 (reemplazo completo)
-
-```bash
-curl -X PUT http://127.0.0.1:8000/users/2 \
-  -H "Content-Type: application/json" \
-  -d '{"name": "Luis Ramirez G.", "email": "luisg@correo.com", "role": "admin", "is_active": false}'
-```
-```json
-{"name": "Luis Ramirez G.", "email": "luisg@correo.com", "role": "admin", "is_active": false, "id": 2}
-```
-Código: `200 OK`
-
-### PATCH /users/3 (actualización parcial)
-
-```bash
-curl -X PATCH http://127.0.0.1:8000/users/3 \
-  -H "Content-Type: application/json" \
-  -d '{"role": "support"}'
-```
-```json
-{"name": "Camilo Sarrazola", "email": "camilo@correo.com", "role": "support", "is_active": false, "id": 3}
-```
-Solo cambió `role`; el resto de los campos quedó intacto. Código: `200 OK`
-
-### PATCH /users/3 (sin campos → error)
-
-```bash
-curl -X PATCH http://127.0.0.1:8000/users/3 -H "Content-Type: application/json" -d '{}'
-```
-```json
-{"detail": "Debes enviar al menos un campo para actualizar"}
-```
-Código: `400 Bad Request`
-
-### DELETE /users/1
-
-```bash
-curl -X DELETE http://127.0.0.1:8000/users/1
-```
-```json
-{"detail": "Usuario con id 1 eliminado correctamente"}
-```
-Código: `200 OK`
-
-## Códigos de estado usados
-
-| Código | Cuándo se usa |
-|---|---|
-| `200 OK` | Operación exitosa (GET, PUT, PATCH, DELETE) |
-| `201 Created` | Usuario creado exitosamente (POST) |
-| `400 Bad Request` | Correo duplicado, o PATCH enviado sin ningún campo |
-| `404 Not Found` | El usuario solicitado no existe |
-| `422 Unprocessable Content` | Datos inválidos según Pydantic (nombre corto, email mal formado, rol no permitido) |
-
-## Evidencia de errores controlados
-
-| Escenario | Método | Código | Respuesta |
+| Operación | Método | Ruta | Código esperado |
 |---|---|---|---|
-| Usuario inexistente | GET / PUT / PATCH / DELETE `/users/999` | `404` | `{"detail": "Usuario no encontrado"}` |
-| Correo duplicado | POST / PUT / PATCH | `400` | `{"detail": "Ya existe un usuario registrado con el correo ..."}` |
-| PATCH sin campos | PATCH | `400` | `{"detail": "Debes enviar al menos un campo para actualizar"}` |
-| Nombre corto (< 3 caracteres) | POST / PUT / PATCH | `422` | Error de Pydantic: `"String should have at least 3 characters"` |
-| Rol no permitido | POST / PUT / PATCH | `422` | Error de Pydantic: `"Input should be 'admin', 'support' or 'user'"` |
-| Correo con formato inválido | POST / PUT / PATCH | `422` | Error de Pydantic: `"value is not a valid email address"` |
+| Listar usuarios | GET | `/users` | `200 OK` |
+| Filtrar/ordenar | GET | `/users?role=admin` / `?is_active=true` / `?order_by=name` | `200 OK` |
+| Consultar usuario | GET | `/users/{user_id}` | `200 OK` / `404 Not Found` |
+| Crear usuario | POST | `/users` | `201 Created` / `400` / `422` |
+| Actualizar completo | PUT | `/users/{user_id}` | `200 OK` / `404` / `400` |
+| Actualizar parcial | PATCH | `/users/{user_id}` | `200 OK` / `404` / `400` |
+| Eliminar usuario | DELETE | `/users/{user_id}` | `200 OK` / `404 Not Found` |
 
-## Explicación del manejo de errores implementado
+##  Evidencia de prueba de cada endpoint
 
-Los errores de **negocio** (usuario no encontrado, correo duplicado, PATCH vacío) se manejan explícitamente con `HTTPException`, devolviendo siempre un JSON simple y consistente:
+Todas estas pruebas se ejecutaron con Postman contra el servidor real, verificando que la información quedara efectivamente persistida en la base de datos:
 
-```python
-raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuario no encontrado")
-```
-```json
-{"detail": "Usuario no encontrado"}
-```
+**Crear usuario (`POST /users`)** — `201 Created`, con `id` y `created_at` asignados por la base de datos:
+![POST exitoso](images/evo9/postman_post_exitoso.png)
 
-Los errores de **validación de datos** (nombre corto, email mal escrito, rol no permitido) los maneja **Pydantic automáticamente** a partir de las reglas definidas en los modelos (`min_length`, `EmailStr`, `Literal`) — FastAPI responde `422` antes de que el código del endpoint se ejecute, sin que se tenga que validar nada manualmente.
+**Listar usuarios (`GET /users`)** — `200 OK`:
+![GET listar usuarios](images/evo9/postman_get_users.png)
 
-## Explicación del uso de Depends() (Dependency Injection)
+**Filtrar por rol (`GET /users?role=admin`)** — `200 OK`, solo los usuarios del rol solicitado:
+![Filtro por rol](images/evo9/postman_filtro_rol.png)
 
-La dependencia principal es `get_user_or_404`, definida en `app/dependencies/user_dependencies.py`:
+**Filtrar por activos (`GET /users?is_active=true`)** — `200 OK`:
+![Filtro por activos](images/evo9/postman_filtro_activos.png)
 
-```python
-def get_user_or_404(user_id: int):
-    usuario = user_service.buscar_usuario_por_id(user_id)
-    if usuario is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado")
-    return usuario
-```
+**Actualizar completo (`PUT /users/{id}`)** — `200 OK`, todos los campos reemplazados:
+![PUT exitoso](images/evo9/postman_put_exitoso.png)
 
-Se reutiliza en **4 rutas distintas** (`GET`, `PUT`, `PATCH` y `DELETE` de `/users/{user_id}`):
+**Actualizar parcial (`PATCH /users/{id}`)** — `200 OK`, solo cambia el campo enviado:
+![PATCH parcial](images/evo9/postman_patch_parcial.png)
 
-```python
-def obtener_usuario(usuario: dict = Depends(get_user_or_404)):
-    return usuario
-```
+**Eliminar usuario (`DELETE /users/{id}`)** — `200 OK`:
+![DELETE exitoso](images/evo9/postman_delete_exitoso.png)
 
-FastAPI ejecuta la dependencia **antes** de entrar al cuerpo del endpoint. Si el usuario no existe, la petición nunca llega a ejecutarse — el `404` se lanza directo desde la dependencia. Gracias a esto, ninguna de esas 4 rutas repite la lógica de "buscar el usuario y verificar que exista".
+**Confirmación de la eliminación** — al volver a consultar el mismo id, responde `404 Not Found`, es decir, el registro se borró de verdad de la base de datos y no solo de la respuesta:
+![Confirmación DELETE - 404](images/evo9/postman_delete_confirmado_404.png)
 
-También se agregaron dos dependencias adicionales como ejemplo del patrón: `obtener_configuracion_api` (centraliza metadatos fijos de la API) y `verificar_api_key` (simula una autenticación básica leyendo la cabecera `X-API-Key` con `Header()`, sin ser obligatoria en esta actividad).
+## ⚠️ Evidencia de errores controlados
 
-## Capturas de Swagger UI
+| Escenario | Código | Captura |
+|---|---|---|
+| Usuario inexistente (`GET /users/999`) | `404 Not Found` | ![404 usuario no encontrado](images/evo9/postman_get_users_404.png) |
+| Correo duplicado (`POST /users`) | `400 Bad Request` | ![400 correo duplicado](images/evo9/postman_post_duplicado_400.png) |
+| PATCH sin ningún campo enviado | `400 Bad Request` | ![400 patch vacío](images/evo9/postman_patch_vacio_400.png) |
+| Datos inválidos — nombre corto / email mal formado / rol no permitido | `422 Unprocessable Entity` | ![422 datos inválidos](images/evo9/postman_post_invalido_422.png) |
 
-![Swagger UI - vista general con el CRUD completo](images/evo8/swagger_general.png)
+En ningún caso la API se cae o responde con un error genérico de servidor: cada escenario devuelve un código HTTP coherente y un mensaje claro sobre qué salió mal, gracias a la combinación de las validaciones de Pydantic (schemas) y las reglas de negocio explícitas en `user_service.py` y `user_routes.py`.
 
+##  Reflexión final sobre la importancia de la persistencia
 
-## Evidencia de pruebas de cada endpoint (Postman)
+Pasar de una lista en memoria a una base de datos real con SQLAlchemy cambió por completo la forma en que pienso esta API. Con la lista, "funcionar" era una ilusión parcial: mientras el servidor seguía encendido todo se veía bien, pero bastaba un `--reload`, un error o simplemente apagar la máquina para que toda la información desapareciera sin dejar rastro. Eso es inaceptable en cualquier sistema que alguien vaya a usar de verdad — nadie confiaría en una API de inventario, usuarios o dispositivos que se "olvida" de todo cada vez que se reinicia.
 
-Todas las capturas están en `images/evo8/`.
+Trabajar con SQLAlchemy también obligó a pensar en los datos de una forma distinta. Ya no basta con que el dato "quepa" en una variable de Python; ahora tiene que respetar restricciones reales de base de datos, como que el correo sea único (`unique=True`) o que ciertos campos nunca puedan quedar vacíos (`nullable=False`). Eso llevó a un aprendizaje que considero el núcleo de esta entrega: **el modelo y el schema no son lo mismo, aunque se parezcan**. El modelo protege la integridad de lo que se guarda; el schema protege la calidad de lo que entra y controla lo que se muestra hacia afuera. Separarlos evita mezclar responsabilidades y hace que, por ejemplo, agregar un campo sensible en el futuro no implique exponerlo automáticamente en las respuestas de la API.
 
-### GET /users
-
-![GET /users](images/evo8/postman_get_users.png)
-
-`200 OK` — lista completa de usuarios.
-
-### GET /users/999 (usuario inexistente)
-
-![GET /users/999](images/evo8/postman_get_user_404.png)
-
-`404 Not Found` — `{"detail": "Usuario no encontrado"}`
-
-### POST /users (exitoso)
-
-![POST /users exitoso](images/evo8/postman_post_exitoso.png)
-
-`201 Created` — usuario creado con `id` asignado automáticamente.
-
-### POST /users (correo duplicado)
-
-![POST /users correo duplicado](images/evo8/postman_post_duplicado_400.png)
-
-`400 Bad Request` — `{"detail": "Ya existe un usuario registrado con el correo sofia@correo.com"}`
-
-### POST /users (datos inválidos)
-
-![POST /users datos inválidos](images/evo8/postman_post_invalido_422.png)
-
-`422 Unprocessable Content` — Pydantic detalla exactamente qué campo(s) fallaron (nombre muy corto, en este caso).
-
-### PUT /users/{id} (reemplazo completo, exitoso)
-
-![PUT /users/2 exitoso](images/evo8/postman_put_exitoso.png)
-
-`200 OK` — todos los campos del usuario quedan reemplazados por los nuevos valores enviados.
-
-### PATCH /users/{id} (actualización parcial)
-
-![PATCH /users/3 parcial](images/evo8/postman_patch_parcial.png)
-
-`200 OK` — solo se modifica el campo `role`; el resto de los datos del usuario permanece igual.
-
-### PATCH /users/{id} (sin campos)
-
-![PATCH /users/3 vacío](images/evo8/postman_patch_vacio_400.png)
-
-`400 Bad Request` — `{"detail": "Debes enviar al menos un campo para actualizar"}`
-
-### DELETE /users/{id} (exitoso)
-
-![DELETE /users/1 exitoso](images/evo8/postman_delete_exitoso.png)
-
-`200 OK` — `{"detail": "Usuario con id 1 eliminado correctamente"}`
-
-### DELETE /users/{id} (usuario ya eliminado)
-
-![DELETE /users/1 ya eliminado](images/evo8/postman_delete_404.png)
-
-`404 Not Found` — porque ya no existe (se había eliminado en la prueba anterior).
-
-## Reflexión final sobre la evolución del proyecto
-
-Lo que más me costó entender fue `Depends()`. Al principio no tenía claro cómo `get_user_or_404` "sabía" cuál era el `user_id` sin que yo se lo pasara explícitamente en cada endpoint. Cuando entendí que FastAPI simplemente hace coincidir el nombre del parámetro con el de la ruta, todo tuvo sentido, y ahí valoré por qué se llama "inyección de dependencias" — la dependencia se ejecuta sola, antes de que mi función siquiera empiece, y si el usuario no existe, ni se molesta en llamar al resto del código.
-
-También aprendí la diferencia real entre PUT y PATCH, no solo en teoría sino haciéndolo: PUT pide todos los campos porque reemplaza el usuario completo, mientras que PATCH usa `exclude_unset=True` para saber exactamente qué envió el cliente y no pisar los demás datos por accidente. Y agregar el DELETE fue el más simple de todos, casi una recompensa después de resolver los otros dos.
-
-En general, este ejercicio me mostró cómo una API pequeña, si no se organiza bien desde el principio, se vuelve difícil de mantener apenas se le agrega una operación más. Separar por responsabilidades no fue un capricho de la guía, fue la única forma de que agregar PUT, PATCH y DELETE no significara reescribir todo lo que ya funcionaba.
 
