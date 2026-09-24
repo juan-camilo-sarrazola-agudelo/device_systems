@@ -1,7 +1,11 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
 from app.auth import auth_routes
+from app.middlewares.rate_limiter import limiter
 from app.middlewares.request_middleware import RequestLoggingMiddleware
 from app.routes import device_routes, loan_routes, user_loan_routes, user_routes
 
@@ -17,6 +21,11 @@ app = FastAPI(
         {"name": "Loans", "description": "Gestion de prestamos de dispositivos"},
     ],
 )
+
+# Rate limiting: limita peticiones abusivas por IP (ver limites en cada ruta)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
 
 # CORS: origenes autorizados para consumir la API desde un frontend en desarrollo.
 # En produccion NO se debe usar "*" cuando allow_credentials=True, porque el

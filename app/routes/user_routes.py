@@ -3,12 +3,13 @@
 
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
-from app.dependencies.auth_dependency import get_current_active_user
 
+from app.dependencies.auth_dependency import get_current_active_user
 from app.dependencies.database_dependency import get_db
 from app.dependencies.user_dependencies import get_user_or_404
+from app.middlewares.rate_limiter import limiter
 from app.models.user_model import User
 from app.schemas.user_schema import UserCreate, UserPatch, UserResponse, UserUpdate
 from app.services import user_service
@@ -16,20 +17,22 @@ from app.services import user_service
 router = APIRouter(prefix="/users", tags=["Users"])
 
 
-@router.get( 
+@router.get(
     "",
     response_model=List[UserResponse],
     summary="Listar usuarios",
-    description="Devuelve los usuarios almacenados en la base de datos. Permite filtrar por rol/estado y ordenar por nombre o fecha de creación.",
+    description="Devuelve los usuarios almacenados en la base de datos. Permite filtrar por rol/estado y ordenar por nombre o fecha de creación. Requiere usuario autenticado.",
     response_description="Lista de usuarios que cumplen el filtro",
+    responses={401: {"description": "Token invalido, ausente o expirado"}},
 )
+@limiter.limit("30/minute")
 def listar_usuarios(
+    request: Request,
     role: Optional[str] = Query(None, description="Filtrar por rol: admin, support o user"),
     is_active: Optional[bool] = Query(None, description="Filtrar por estado activo/inactivo"),
     order_by: Optional[str] = Query(None, description="Ordenar por: name o created_at"),
     db: Session = Depends(get_db),
     _usuario_actual: User = Depends(get_current_active_user),
-    
 ):
     return user_service.listar_usuarios(db, role=role, is_active=is_active, order_by=order_by)
 
@@ -38,8 +41,9 @@ def listar_usuarios(
     "/{user_id}",
     response_model=UserResponse,
     summary="Consultar un usuario",
-    description="Devuelve un usuario puntual a partir de su id.",
+    description="Devuelve un usuario puntual a partir de su id. Requiere usuario autenticado.",
     response_description="Datos del usuario encontrado",
+    responses={401: {"description": "Token invalido, ausente o expirado"}},
 )
 def obtener_usuario(usuario: User = Depends(get_user_or_404), _usuario_actual: User = Depends(get_current_active_user)):
     return usuario
