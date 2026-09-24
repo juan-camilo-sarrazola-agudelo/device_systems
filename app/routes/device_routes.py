@@ -2,6 +2,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
+from app.dependencies.auth_dependency import require_admin, require_admin_or_support
 from app.dependencies.database_dependency import get_db
 from app.schemas.device_schema import DeviceCreate, DevicePatch, DeviceResponse, DeviceUpdate
 from app.schemas.loan_schema import LoanDetailResponse
@@ -58,7 +59,7 @@ def historial_prestamos_dispositivo(device_id: int, db: Session = Depends(get_db
     response_description="Dispositivo creado",
     responses={400: {"description": "Numero de serie duplicado"}, 422: {"description": "Error de validacion"}},
 )
-def crear_dispositivo(device: DeviceCreate, db: Session = Depends(get_db)):
+def crear_dispositivo(device: DeviceCreate, db: Session = Depends(get_db), _usuario_actual: User = Depends(require_admin_or_support)):
     return device_service.create_device(db, device)
 
 
@@ -70,7 +71,7 @@ def crear_dispositivo(device: DeviceCreate, db: Session = Depends(get_db)):
     response_description="Dispositivo actualizado",
     responses={404: {"description": "Dispositivo no encontrado"}, 400: {"description": "Numero de serie duplicado"}},
 )
-def actualizar_dispositivo(device_id: int, device: DeviceUpdate, db: Session = Depends(get_db)):
+def actualizar_dispositivo(device_id: int, device: DeviceUpdate, db: Session = Depends(get_db), _usuario_actual: User = Depends(require_admin_or_support)):
     return device_service.update_device(db, device_id, device)
 
 
@@ -91,5 +92,5 @@ def parchar_dispositivo(device_id: int, device: DevicePatch, db: Session = Depen
     summary="Eliminar un dispositivo",
     responses={404: {"description": "Dispositivo no encontrado"}},
 )
-def eliminar_dispositivo(device_id: int, db: Session = Depends(get_db)):
+def eliminar_dispositivo(device_id: int, db: Session = Depends(get_db), _usuario_actual: User = Depends(require_admin)):
     device_service.delete_device(db, device_id)
