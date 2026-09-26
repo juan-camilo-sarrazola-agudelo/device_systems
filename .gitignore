@@ -6,3 +6,7 @@ __pycache__/
 .idea/
 
 *.db
+<<<<<<< HEAD
+=======
+.env
+>>>>>>> device_systems_security
