@@ -12,7 +12,7 @@ from app.routes import device_routes, loan_routes, user_loan_routes, user_routes
 app = FastAPI(
     title="device_systems API",
     description="API REST segura para la gestion de usuarios, dispositivos y prestamos del sistema device_systems, con autenticacion OAuth2/JWT, CORS, middleware de trazabilidad y rate limiting.",
-    version="5.0.0",
+    version="6.0.0",
     contact={"name": "Juan Camilo Sarrazola", "email": "camilo@correo.com"},
     openapi_tags=[
         {"name": "Auth", "description": "Registro, login y consulta del usuario autenticado"},
@@ -54,4 +54,4 @@ app.include_router(loan_routes.router)
 
 @app.get("/", tags=["Raiz"])
 def raiz():
-    return {"mensaje": "Bienvenido a device_systems API v5.0. Visita /docs para ver la documentacion."}
+    return {"mensaje": "Bienvenido a device_systems API v6.0 (EV11 - Seguridad). Visita /docs para ver la documentacion."}
